@@ -39,6 +39,23 @@
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
 
+1. Flask validates the JSON body and the required text and creator ID.
+2. The local language model reads the text and produces a predictability-based model score.
+3. `stylometry.style_signal` measures sentence-length spread, vocabulary variety, and punctuation density.
+4. `scoring.combine_signals` combines both 0–1 scores into one confidence score.
+5. `scoring.score_to_label` maps that score to one of the three reader-facing labels.
+6. `audit.log_decision` records the content ID, creator, signals, score, label, and status.
+7. Flask returns the content ID, scores, confidence, guess, and label.
+
+### Endpoint contracts
+
+- `POST /submit` accepts `{"text": string, "creator_id": string}` and returns
+  `content_id`, `guess`, `confidence`, `label`, `model_score`, and
+  `style_score`. Invalid JSON or fields receive a 4xx response.
+- `POST /appeal` accepts `{"content_id": string, "reasoning": string}` and
+  returns the content ID, `status: "under_review"`, and a confirmation
+  message. The reasoning is appended to the audit log; the original decision
+  is not automatically re-scored.
 
 
 ---
@@ -55,18 +72,24 @@
 
 **What it measures:**
 
+How predictable the text is to a local GPT-2 language model, represented by perplexity and converted so lower perplexity means a higher AI-likelihood score.
 **Why that might differ between human and AI writing:**
 
+Generated text often follows high-probability word choices and predictable sentence patterns, while human writing can make more surprising choices.
 **What it can't see:**
 
+It cannot establish authorship: plain human writing, second-language writing, or edited AI text can also be predictable, while formal human writing can be surprising.
 ### Signal two — the style signal
 
 **What it measures:**
 
+The text's shape: sentence-length variation, type-token ratio (vocabulary variety), and punctuation density.
 **Why that might differ between human and AI writing:**
 
+Generated prose often has even sentence lengths, repeated common vocabulary, and restrained punctuation; human prose tends to vary more.
 **What it can't see:**
 
+It cannot understand meaning or context. Reformatting, adding typos, inserting quotations, or changing punctuation can move this score without changing the author's ideas.
 ### The combining rule
 
 <!-- Write the rule in words, then give the numbers. What happens when the two
@@ -74,8 +97,10 @@
 
 **The rule:**
 
+Use a weighted average. When the signals disagree, neither overrules the other; their disagreement pulls the result toward unsure.
 **The numbers:**
 
+`0.5 * model_score + 0.5 * style_score`, clamped to 0.0–1.0 and rounded to four decimal places.
 **Where it lives:** `scoring.py::combine_signals`
 
 <!-- ⚠️ The grader checks your code against that line. If your rule lives
@@ -83,6 +108,23 @@
 
 **A case where my two signals split, and what my rule does with it:**
 
+With model score 0.90 and style score 0.10, the combined score is 0.50 and the label is unsure.
+
+### Four-input calibration
+
+| Input | Model score | Style score | Combined score | Label |
+|---|---:|---:|---:|---|
+| Clearly AI | 0.8864 | 0.4282 | 0.6573 | high-confidence AI |
+| Clearly human | 0.6817 | 0.4238 | 0.5527 | unsure |
+| Formal human | 0.3897 | 0.4448 | 0.4173 | unsure |
+| Lightly edited AI | 0.5585 | 0.3573 | 0.4579 | unsure |
+
+The model and style signals split most noticeably on the clearly-AI sample:
+the model score was 0.8864 while the style score was 0.4282. The average
+crossed the high-confidence AI threshold, but the style signal moderated the
+result. The formal-human and lightly-edited-AI samples demonstrate why an
+uncertainty band is useful: neither combination was strong enough for a
+high-confidence accusation.
 
 
 ---
@@ -96,15 +138,15 @@
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00–0.35 | High-confidence human: this text is probably written by a person. |
+| unsure | 0.35–0.65 | Unsure: the available signals are not strong enough to determine authorship. |
+| high-confidence AI | 0.65–1.00 | High-confidence AI: this text is probably AI-generated. |
 
 **Why I worded the "unsure" one this way:**
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
-
+It states the limitation of the signals without accusing the writer or implying that an uncertain result is proof of AI authorship.
 
 
 ---
@@ -128,7 +170,14 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 ```
 
 ```json
-
+{
+  "confidence": 0.445,
+  "content_id": "d3c2d386-57e4-43b6-8124-3a8c87fd25cd",
+  "guess": "unsure",
+  "label": "Unsure: the available signals are not strong enough to determine authorship.",
+  "model_score": 0.5781,
+  "style_score": 0.3119
+}
 ```
 
 **An appeal**
@@ -140,7 +189,22 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 ```
 
 ```json
-
+{
+  "count": 1,
+  "entries": [
+    {
+      "combined_score": 0.445,
+      "content_id": "d3c2d386-57e4-43b6-8124-3a8c87fd25cd",
+      "creator_id": "milestone3-writer",
+      "guess": "unsure",
+      "label": "Unsure: the available signals are not strong enough to determine authorship.",
+      "model_score": 0.5781,
+      "status": "decided",
+      "style_score": 0.3119,
+      "timestamp": "2026-10-29T01:31:50+00:00"
+    }
+  ]
+}
 ```
 
 **What the log shows afterwards**
@@ -150,7 +214,11 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 ```
 
 ```json
-
+{
+  "content_id": "d3c2d386-57e4-43b6-8124-3a8c87fd25cd",
+  "message": "Appeal recorded; this content is under review.",
+  "status": "under_review"
+}
 ```
 
 ---
@@ -209,7 +277,30 @@ can look like one. -->
 <!-- Choose entries that show the interesting failures, not the ten easiest. -->
 
 ```json
-
+{
+  "count": 2,
+  "entries": [
+    {
+      "combined_score": 0.445,
+      "content_id": "d3c2d386-57e4-43b6-8124-3a8c87fd25cd",
+      "creator_id": "milestone3-writer",
+      "guess": "unsure",
+      "label": "Unsure: the available signals are not strong enough to determine authorship.",
+      "model_score": 0.5781,
+      "status": "decided",
+      "style_score": 0.3119,
+      "timestamp": "2026-10-29T01:31:50+00:00"
+    },
+    {
+      "content_id": "d3c2d386-57e4-43b6-8124-3a8c87fd25cd",
+      "creator_id": "milestone3-writer",
+      "event": "appeal",
+      "reasoning": "I wrote this passage myself and would like a human review.",
+      "status": "under_review",
+      "timestamp": "2026-10-29T01:39:48+00:00"
+    }
+  ]
+}
 ```
 
 **The single worst outcome** — the one I'd least want to explain to a writer
