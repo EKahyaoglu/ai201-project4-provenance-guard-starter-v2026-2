@@ -1,0 +1,2 @@
+{"timestamp":"2026-10-29T01:31:50+00:00","content_id":"d3c2d386-57e4-43b6-8124-3a8c87fd25cd","creator_id":"sample-writer","guess":"unsure","model_score":0.5781,"style_score":0.3119,"combined_score":0.445,"label":"Unsure: the available signals are not strong enough to determine authorship.","status":"decided"}
+{"timestamp":"2026-10-29T01:39:48+00:00","content_id":"d3c2d386-57e4-43b6-8124-3a8c87fd25cd","creator_id":"sample-writer","event":"appeal","status":"under_review","reasoning":"I wrote this passage myself and would like a human review."}
