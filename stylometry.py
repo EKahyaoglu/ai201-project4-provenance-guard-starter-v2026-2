@@ -1,12 +1,11 @@
 """
-Signal two: the style signal. ← YOU BUILD THIS IN MILESTONE 4
+Signal two: the style signal.
 
-Signal one reads the text for meaning. This one measures it *as text* — the
+Signal one reads the text for meaning. This one measures it *as text* - the
 shape of it, without understanding a word.
 
-Three measures are stubbed below because the brief names those three. They are
-stubs, not implementations: what they compute is yours, and so is how you
-combine them.
+Three measures are implemented below because the brief names those three. The
+style score combines them into one signal.
 
     sentence_length_spread   do sentences vary in length, or march in step?
     type_token_ratio         how much of the vocabulary repeats?
@@ -15,12 +14,12 @@ combine them.
 Why these might differ between human and AI writing: generated prose tends
 toward even, mid-length sentences and a narrower band of vocabulary, because
 that's what "most likely next word" produces on average. Human writing is
-lumpier — a three-word sentence next to a forty-word one.
+lumpier - a three-word sentence next to a forty-word one.
 
-⚠️ **The blind spot, which you have to name in Milestone 1.**
+**Blind spot:** this signal cannot understand meaning or authorship.
 
 This signal cannot read. It has no idea what the text says. Anything that
-changes the shape without changing the substance moves it — adding typos,
+changes the shape without changing the substance moves it - adding typos,
 breaking up sentences, pasting in a quotation. That is a very cheap thing for
 someone to do on purpose, and unit 8's attack set will do it to you.
 
@@ -35,7 +34,7 @@ import statistics
 
 
 def sentences(text: str) -> list[str]:
-    """Split into sentences. Rough and good enough — given to you."""
+    """Split into sentences. Rough and good enough - given to you."""
     parts = re.split(r"(?<=[.!?])\s+", text.strip())
     return [p for p in parts if p.strip()]
 
@@ -45,15 +44,15 @@ def words(text: str) -> list[str]:
     return re.findall(r"[a-z0-9']+", text.lower())
 
 
-# ── The three measures — YOU BUILD THESE ─────────────────────────────────────
+# The three measures
 
 def sentence_length_spread(text: str) -> float:
     """
-    How much sentence length varies. ← TODO
+    How much sentence length varies.
 
     Returns:
         A float. Decide yourself what scale it's on and which direction means
-        "more human" — then write that down, because your combining rule
+        "more human" - then write that down, because your combining rule
         depends on knowing it.
 
     A hint on what you're reaching for: the standard deviation of sentence
@@ -75,7 +74,7 @@ def sentence_length_spread(text: str) -> float:
 
 def type_token_ratio(text: str) -> float:
     """
-    Unique words over total words. ← TODO
+    Unique words over total words.
 
     Returns:
         A float between 0 and 1. Higher means more varied vocabulary.
@@ -91,11 +90,11 @@ def type_token_ratio(text: str) -> float:
 
 def punctuation_density(text: str) -> float:
     """
-    How much punctuation, relative to length. ← TODO
+    How much punctuation, relative to length.
 
     Returns:
-        A float. Whether you count all punctuation or only some kinds — commas,
-        semicolons, dashes — is a real choice. Semicolons and em dashes are
+        A float. Whether you count all punctuation or only some kinds - commas,
+        semicolons, dashes - is a real choice. Semicolons and em dashes are
         more interesting than full stops, because they vary more between
         writers.
     """
@@ -109,11 +108,11 @@ def punctuation_density(text: str) -> float:
 
 def style_signal(text: str) -> float:
     """
-    The style signal as a 0–1 score. **Higher means more likely AI.** ← TODO
+    The style signal as a 0–1 score. **Higher means more likely AI.**
 
     Combine your three measures into one number. Same direction as
     `detector.model_signal`, so that `scoring.combine_signals` can treat them
-    the same way — if one of your signals runs backwards, everything above it
+    the same way - if one of your signals runs backwards, everything above it
     is wrong in a way that's hard to see.
 
     Two things to decide and write down:
@@ -124,8 +123,8 @@ def style_signal(text: str) -> float:
          between 0 and 1; a raw punctuation count doesn't. Adding them
          unscaled means whichever has the bigger numbers wins by default.
 
-    Test it on the four calibration inputs from Milestone 4 — clearly AI,
-    clearly human, plain conventional human writing, lightly-edited AI — before
+    Test it on the four calibration inputs from Milestone 4 - clearly AI,
+    clearly human, plain conventional human writing, lightly-edited AI - before
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
     """
@@ -157,4 +156,4 @@ if __name__ == "__main__":
     print(f"type_token_ratio         {type_token_ratio(text)}")
     print(f"punctuation_density      {punctuation_density(text)}")
     print(f"style_signal             {style_signal(text)}   (higher = more likely AI)")
-    print("\nAll zeros? These are stubs — Milestone 4 is where you build them.")
+    print("\nThe style signal is ready to use.")
