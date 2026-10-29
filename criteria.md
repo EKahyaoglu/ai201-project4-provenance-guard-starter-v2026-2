@@ -44,11 +44,9 @@ Two things worth knowing before you pick numbers:
 ---
 ## 1.
 
-<!-- Your criterion. It must name a number. -->
+Of 10 self-written submissions, at most 1 may receive the high-confidence AI label in each trial.
 
-
-
-**Why this target:**
+**Why this target:** A false accusation is more harmful than missing some AI text, so the service should keep false positives below 10%.
 
 
 
@@ -56,11 +54,9 @@ Two things worth knowing before you pick numbers:
 
 ## 2.
 
-<!-- Your criterion. -->
+Across the calibration set, the highest and lowest combined scores must differ by at least 0.30.
 
-
-
-**Why this target:**
+**Why this target:** A score that barely moves cannot support meaningful confidence labels.
 
 
 
@@ -68,11 +64,9 @@ Two things worth knowing before you pick numbers:
 
 ## 3.
 
-<!-- Your criterion. -->
+The high-confidence human, unsure, and high-confidence AI labels must each be produced by at least one valid submission.
 
-
-
-**Why this target:**
+**Why this target:** Every label is part of the public contract and must be reachable rather than dead code.
 
 
 
@@ -80,11 +74,9 @@ Two things worth knowing before you pick numbers:
 
 ## 4.
 
-<!-- Your criterion. -->
+For 10 valid appeals, every response must be HTTP 200, include `status: "under_review"`, and add an appeal entry containing the submitted reasoning.
 
-
-
-**Why this target:**
+**Why this target:** A writer needs a reliable, auditable path to challenge a wrong accusation.
 
 
 
@@ -92,11 +84,9 @@ Two things worth knowing before you pick numbers:
 
 ## 5.
 
-<!-- Your criterion. -->
+Missing, empty, non-string, or over-100,000-character text must receive a 4xx response and must not invoke either detector signal.
 
-
-
-**Why this target:**
+**Why this target:** Invalid input should be rejected clearly and safely instead of causing a server error or wasting model resources.
 
 
 
