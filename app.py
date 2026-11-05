@@ -220,6 +220,9 @@ def submit():
     if not isinstance(text, str) or not text.strip():
         _log_submit_rejection(payload, "invalid_text")
         return jsonify({"error": "invalid_text", "message": "text must be a non-empty string."}), 400
+    if len(text.strip()) < 20:
+        _log_submit_rejection(payload, "text_too_short")
+        return jsonify({"error": "text_too_short", "message": "text must contain at least 20 non-whitespace characters."}), 400
     if not isinstance(creator_id, str) or not creator_id.strip():
         _log_submit_rejection(payload, "invalid_creator_id")
         return jsonify({"error": "invalid_creator_id", "message": "creator_id must be a non-empty string."}), 400

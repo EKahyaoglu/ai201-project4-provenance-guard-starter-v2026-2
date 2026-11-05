@@ -35,7 +35,7 @@ The limiter returns `429` after the per-minute limit is reached. Rate-limited
 requests and invalid submissions are recorded in the audit log as rejected
 events.
 
-## Attack Set Run
+## Attack Run - Before
 
 I ran all 56 rows from the supplied attack set on 2026-11-04. The detailed
 report is in `results/attack_run_2026-11-04_2106.md`.
@@ -75,7 +75,7 @@ Selected audit entries from the run, including rejected requests:
 {"creator_id":"attacker_flood","event":"rejected","limit":"10 per 1 minute","reason":"rate_limited","status":"rejected","timestamp":"2026-11-05T02:06:11+00:00"}
 ```
 
-## My Five Criteria
+## Run Log and Verdicts
 
 I replaced the placeholders in `scenarios.py` and ran
 `python run_eval.py --label before`. The evaluator produced
@@ -194,6 +194,85 @@ The broken attack outcomes have the following stage and mechanism:
   first ten requests in the minute, so those flood requests reached scoring.
   `FL01_11` and `FL01_12` were held with `429`.
 
+## The Improvement
+
+I made one change: `/submit` now rejects text with fewer than 20 non-whitespace
+characters before either signal runs. The change is in `app.py::submit`, and
+the rejection is logged as `text_too_short`. I chose input validation because
+`MF02` passed the old non-empty check and then signal one raised
+`ValueError: Text is too short to score`.
+
+### Attack Run - After
+
+I reran all 56 attacks with `python run_attacks.py --set attack_set --label
+after`. The full report is
+`results/attack_run_2026-11-04_2111_after.md`.
+
+| Family | Before broke | After broke | Change |
+|---|---:|---:|---:|
+| evasion | 3 | 3 | 0 |
+| false_positive | 2 | 2 | 0 |
+| prompt_injection | 0 | 0 | 0 |
+| malformed | 7 | 6 | -1 |
+| flood_same_creator | 10 | 10 | 0 |
+| **Total** | **22** | **21** | **-1** |
+
+The improvement helped: `MF02` changed from `500` and BROKE to `400` and
+HELD. Every other attack produced the same classification as before.
+
+### Criteria Run - After
+
+I reran `python run_eval.py --label after`; the output is in
+`results/run_2026-11-04_2111_after.md`. All three trials again matched.
+
+| Criterion | Before | After | Verdict after |
+|---|---:|---:|---|
+| 1. My own writing called AI | 0/10 | 0/10 | MET |
+| 2. All three labels reachable | 2/3 | 2/3 | MISSED |
+| 3. Malformed input returns 400, not 500 | 4/5 | 5/5 | MET |
+| 4. Every valid decision has complete fields | 5/5 | 5/5 | MET |
+| 5. Identical input gives repeatable scores | 5/5 | 5/5 | MET |
+
+The change fixed the malformed-input criterion. It did not improve label
+coverage because that miss is caused by the label threshold and scenario
+inputs, not by short text reaching the detector.
+
+## What's Still Broken
+
+The remaining broken attacks are `EV01`, `EV05`, `EV08`, `FP05`, `FP07`,
+`MF03`, `MF04`, `MF05`, `MF06`, `MF07`, `MF08`, and `FL01_01` through
+`FL01_10`.
+
+- `EV01`, `EV05`, and `EV08` still exploit signal one or signal two with typos,
+  editing, or a short token-window input. I would add adversarial validation
+  and calibrate both signals on edited AI text, but I stopped because that
+  would be a second change and would need a new measured baseline.
+- `FP05` and `FP07` still accuse genuine technical or repetitive writing. I
+  would widen the unsure band or lower the AI threshold after measuring the
+  false-positive tradeoff. I stopped to avoid changing the scoring policy
+  without a separate before-and-after experiment.
+- `MF03` through `MF08` still allow control characters, punctuation, unusual
+  scripts, or very large inputs to reach scoring. I would add content-quality
+  validation for printable text, token limits, and script-aware handling. I
+  stopped after fixing the diagnosed crash so the effect of one change stayed
+  measurable.
+- `FL01_01` through `FL01_10` are expected to pass because the configured
+  policy allows ten requests per creator per minute. I would lower the burst
+  limit or add a short-term window if abuse mattered more than writer
+  convenience. I stopped because changing the limit would be a separate
+  rate-limit experiment.
+
+The remaining missed criterion is label coverage. I would add a calibrated
+high-score fixture or revise the target only if the criterion were measuring
+the intended reachable range. I stopped because the current run honestly shows
+that the supplied three inputs reached only human and unsure.
+
+In production I would prefer fewer wrong accusations over catching every
+possible AI submission, because a false accusation harms a real writer's
+review and trust. The cost is that some AI text would remain in the unsure or
+human bands, so I would pair the detector with human review rather than treat
+the label as proof.
+
 ## Signals and Scoring
 
 ### Model signal
@@ -310,5 +389,16 @@ These are the corresponding lines in `logs/audit.jsonl`:
   separate appeal entry with `under_review` status.
 - What I changed: Replaced placeholders with a complete request, response, and
   two matching JSONL log entries.
+
+### Moment 3
+
+- What I asked: Help compare the attack and evaluation runs and identify one
+  measurable improvement without changing multiple stages at once.
+- What I got: A recommendation to validate minimum text length before calling
+  the detector because the single-character attack reached signal one and
+  caused a server error.
+- What I changed: Added the 20-character input check, reran both suites, and
+  documented that it fixed the malformed-input miss while leaving the other
+  classifications unchanged.
 
 See [RUNNING.md](RUNNING.md) for setup and execution instructions.
