@@ -35,6 +35,46 @@ The limiter returns `429` after the per-minute limit is reached. Rate-limited
 requests and invalid submissions are recorded in the audit log as rejected
 events.
 
+## Attack Set Run
+
+I ran all 56 rows from the supplied attack set on 2026-11-04. The detailed
+report is in `results/attack_run_2026-11-04_2106.md`.
+
+| Family | Attacks | Held | Broke |
+|---|---:|---:|---:|
+| evasion | 10 | 7 | 3 |
+| false_positive | 8 | 6 | 2 |
+| prompt_injection | 6 | 6 | 0 |
+| malformed | 20 | 13 | 7 |
+| flood_same_creator | 12 | 2 | 10 |
+| **Total** | **56** | **34** | **22** |
+
+I marked an evasion as broke when the detector called the AI text human, and
+a false positive as broke when genuine human text was called AI. Malformed
+requests were held when safely rejected and broke when accepted as junk or
+caused a server error. The flood rows that returned `201` were marked broke;
+the two rows that returned `429` were held.
+
+The worst writer-facing outcome was `FP07`. It was genuine human writing with
+a deliberately repeated phrase, but the service returned `ai` with a combined
+score of `0.7000`. `FP05` was another false positive, with technical
+documentation returned as `ai` at `0.6727`.
+
+Selected audit entries from the run, including rejected requests:
+
+```json
+{"combined_score":0.3063,"content_id":"86779e1e-46a8-4038-a652-52238d752e81","creator_id":"attacker_EV01","guess":"human","label":"High-confidence human: this text is probably written by a person.","model_score":0.1635,"status":"decided","style_score":0.4491,"timestamp":"2026-11-05T02:06:05+00:00"}
+{"combined_score":0.3056,"content_id":"ab04ce3a-a0bd-4746-9d52-93e37c2ffad5","creator_id":"attacker_EV05","guess":"human","label":"High-confidence human: this text is probably written by a person.","model_score":0.3212,"status":"decided","style_score":0.29,"timestamp":"2026-11-05T02:06:06+00:00"}
+{"combined_score":0.3191,"content_id":"86dce6bf-2dfc-4755-b340-55d5f82bde2f","creator_id":"attacker_EV08","guess":"human","label":"High-confidence human: this text is probably written by a person.","model_score":0.2452,"status":"decided","style_score":0.3929,"timestamp":"2026-11-05T02:06:06+00:00"}
+{"combined_score":0.6727,"content_id":"f13ea1b4-1ea9-47c0-adbf-383002f353df","creator_id":"attacker_FP05","guess":"ai","label":"High-confidence AI: this text is probably AI-generated.","model_score":0.8005,"status":"decided","style_score":0.545,"timestamp":"2026-11-05T02:06:07+00:00"}
+{"combined_score":0.7,"content_id":"86c24de5-7c8a-4b61-9f9d-b82afc4b5d1e","creator_id":"attacker_FP07","guess":"ai","label":"High-confidence AI: this text is probably AI-generated.","model_score":0.8816,"status":"decided","style_score":0.5184,"timestamp":"2026-11-05T02:06:08+00:00"}
+{"combined_score":0.9985,"content_id":"371248b1-5261-4b82-a718-c603500f644f","creator_id":"attacker_MF06","guess":"ai","label":"High-confidence AI: this text is probably AI-generated.","model_score":0.9969,"status":"decided","style_score":1.0,"timestamp":"2026-11-05T02:06:10+00:00"}
+{"combined_score":0.9532,"content_id":"ec39e299-c6fd-4e0e-af54-a401b53dcd44","creator_id":"attacker_MF07","guess":"ai","label":"High-confidence AI: this text is probably AI-generated.","model_score":0.9064,"status":"decided","style_score":1.0,"timestamp":"2026-11-05T02:06:10+00:00"}
+{"combined_score":0.8621,"content_id":"55045301-44cc-49e3-a9cf-98eccf8e6b1e","creator_id":"attacker_MF08","guess":"ai","label":"High-confidence AI: this text is probably AI-generated.","model_score":0.9876,"status":"decided","style_score":0.7367,"timestamp":"2026-11-05T02:06:10+00:00"}
+{"creator_id":"attacker_RQ12","event":"rejected","reason":"invalid_text","status":"rejected","timestamp":"2026-11-05T02:06:10+00:00"}
+{"creator_id":"attacker_flood","event":"rejected","limit":"10 per 1 minute","reason":"rate_limited","status":"rejected","timestamp":"2026-11-05T02:06:11+00:00"}
+```
+
 ## Signals and Scoring
 
 ### Model signal
