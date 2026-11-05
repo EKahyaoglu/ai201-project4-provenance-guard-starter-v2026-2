@@ -117,6 +117,15 @@ if config.RATE_LIMITING_ENABLED:
         }), 429
 
 
+def _log_submit_rejection(payload, reason: str) -> None:
+    creator_id = "unknown"
+    if isinstance(payload, dict):
+        candidate = payload.get("creator_id")
+        if isinstance(candidate, str) and candidate.strip():
+            creator_id = candidate
+    audit.log_rejection(creator_id=creator_id, reason=reason)
+
+
 # ── The worked example. Already works. Don't edit. ────────────────────────────
 
 @app.post("/ping")
@@ -153,7 +162,7 @@ def health():
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
 @app.post("/submit")
-# @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
     """
     Take a piece of text, decide about it, log the decision, answer.
@@ -203,15 +212,19 @@ def submit():
     """
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
+        _log_submit_rejection(payload, "invalid_json")
         return jsonify({"error": "invalid_json", "message": "Request body must be a JSON object."}), 400
 
     text = payload.get("text")
     creator_id = payload.get("creator_id")
     if not isinstance(text, str) or not text.strip():
+        _log_submit_rejection(payload, "invalid_text")
         return jsonify({"error": "invalid_text", "message": "text must be a non-empty string."}), 400
     if not isinstance(creator_id, str) or not creator_id.strip():
+        _log_submit_rejection(payload, "invalid_creator_id")
         return jsonify({"error": "invalid_creator_id", "message": "creator_id must be a non-empty string."}), 400
     if len(text) > 100_000:
+        _log_submit_rejection(payload, "text_too_large")
         return jsonify({"error": "text_too_large", "message": "text must be 100,000 characters or fewer."}), 413
 
     import detector

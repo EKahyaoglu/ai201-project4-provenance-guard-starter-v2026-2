@@ -19,6 +19,22 @@ An appeal sent to `POST /appeal` verifies the content ID, records the
 reasoning, and appends an `under_review` entry without changing the original
 decision.
 
+## Rate Limiting
+
+`POST /submit` allows 10 requests per creator per minute and 200 per creator
+per day. This leaves room for a writer to submit their own work while limiting
+scripts that send many variations to map the thresholds.
+
+Run the flood check with:
+
+```text
+python run_attacks.py --flood 15
+```
+
+The limiter returns `429` after the per-minute limit is reached. Rate-limited
+requests and invalid submissions are recorded in the audit log as rejected
+events.
+
 ## Signals and Scoring
 
 ### Model signal
