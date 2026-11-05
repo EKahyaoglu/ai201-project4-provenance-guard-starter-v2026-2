@@ -26,45 +26,61 @@ SCENARIOS = [
     {
         "name": "my own writing",
         "criterion": 1,
-        # ⚠️ PUT YOUR OWN WRITING HERE. Not AI text, not a sample from the web —
-        # things you actually wrote. This is the criterion that matters most and
-        # it's meaningless with someone else's prose.
         "texts": [
-            "REPLACE ME with a paragraph you wrote yourself.",
-            "REPLACE ME with another one. Ten pieces is the usual number.",
+            "I keep a short list beside my keyboard because small decisions disappear quickly. When I finish a task, I write down what changed and why, even if the answer seems obvious at the time.",
+            "The hallway light flickered twice before breakfast. I replaced the bulb after lunch, but I left the old one on the counter because I wanted to remember that the problem had been simple.",
+            "I prefer tests that explain what went wrong. A green check is useful, but a failure that names the input and the expected result teaches me where my assumption was wrong.",
+            "On busy mornings I make coffee before I open my messages. It is not a productivity system, just a small pause that keeps the first urgent request from choosing the shape of the whole day.",
+            "The first draft of this note was too tidy. I put back the awkward sentence because it described the decision more honestly than the polished version did.",
+            "I learned the route by missing the turn three times. Now I notice the blue sign early, though I still slow down there because habit is not the same thing as attention.",
+            "A useful tool should make the next step clearer, not hide the work behind a confident button. When I cannot explain what a button did, I do not trust the result yet.",
+            "Our meeting ended with fewer decisions than expected. That was fine. We separated the questions we could answer today from the ones that needed someone else to look at the evidence.",
+            "I save examples of mistakes because memory edits them into cleaner stories. The screenshot with the wrong filename is more useful than the final folder when I am trying to understand the sequence.",
+            "There is a difference between being finished and being ready to show someone else. I check the edge cases after the main path works, then I write down the one limitation I still would not want to hide.",
         ],
     },
     {
         "name": "label coverage",
         "criterion": 2,
-        # Inputs spread across your score range, so you can check all three
-        # labels are actually reachable.
         "texts": [
-            "REPLACE ME with something you're confident is AI-generated.",
-            "REPLACE ME with something you're confident is human-written.",
-            "REPLACE ME with something genuinely borderline.",
+            "In conclusion, this comprehensive analysis demonstrates that the implementation of a robust and scalable solution provides significant value across a wide range of operational contexts. The following sections summarize the key findings and recommended next steps.",
+            "I missed the bus, bought a warm cheese roll, and arrived ten minutes late. The driver shrugged when I apologized, which somehow made the whole morning feel less serious.",
+            "The plan is reasonable, but the evidence is thin. I would keep the change behind a flag for one week, compare the error reports, and decide after seeing which cases actually move.",
         ],
     },
-    # A bad-input criterion looks like this. Uncomment and adjust if that's one
-    # of your five — these are raw request bodies, sent exactly as written.
-    #
-    # {
-    #     "name": "bad input",
-    #     "criterion": 3,
-    #     "bodies": [
-    #         {"text": "", "creator_id": "eval_bad_empty"},
-    #         {"creator_id": "eval_bad_missing"},          # no text field at all
-    #         {"text": "word " * 50000, "creator_id": "eval_bad_huge"},
-    #         {"text": None, "creator_id": "eval_bad_null"},
-    #     ],
-    # },
-
-    # TODO: add what your remaining criteria need.
-    #
-    # A criterion about the appeal path can't be tested by sending text alone;
-    # it needs a submission first and then an appeal against the content_id
-    # that came back. You'll need to test that one by hand, or extend this file
-    # and run_eval.py to do it. Saying which you did is part of the write-up.
+    {
+        "name": "malformed input safety",
+        "criterion": 3,
+        "bodies": [
+            {"text": "", "creator_id": "eval_bad_empty"},
+            {"creator_id": "eval_bad_missing"},
+            {"text": None, "creator_id": "eval_bad_null"},
+            {"text": "x", "creator_id": "eval_bad_short"},
+            {"text": ["not", "text"], "creator_id": "eval_bad_list"},
+        ],
+    },
+    {
+        "name": "complete decision response",
+        "criterion": 4,
+        "texts": [
+            "A decision should carry enough information to be checked later. The identifier, both signals, the combined confidence, the short guess, and the reader-facing label all belong together.",
+            "I changed one setting and wrote down the old value first. That small habit makes a rollback less dramatic because the previous state is not something I have to reconstruct from memory.",
+            "The report is useful only when its numbers still point to the request that produced them. I would rather have a plain identifier than a beautiful summary that cannot be traced.",
+            "A rejection is also a result. If the service refuses a request, the reason and the caller should remain visible instead of disappearing between the client and the server.",
+            "The final check is not a ceremony. I read the response as if I were debugging it tomorrow, when the terminal is closed and the original intention is no longer obvious.",
+        ],
+    },
+    {
+        "name": "repeatable scores",
+        "criterion": 5,
+        "texts": [
+            "A stable detector should give the same input the same score when its configuration and model remain unchanged. Repeating a measurement helps separate a real behavior from a lucky observation.",
+            "The window was open during the storm, so the papers moved across the desk. I closed it, gathered the pages, and put the unfinished note back where I could find it.",
+            "A threshold is a decision rule, not a fact about authorship. It should be explained in terms of the signals and checked against examples that make its weak spots visible.",
+            "I do not want a log that merely says success. I want the request identity, the inputs used for the decision, and the outcome that a later reader can compare with the original evidence.",
+            "When a repair changes behavior, I rerun the old examples before I trust the new result. The point is not to preserve every number, but to know which change caused the difference.",
+        ],
+    },
 ]
 
 

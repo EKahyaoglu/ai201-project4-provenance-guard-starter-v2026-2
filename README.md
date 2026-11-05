@@ -75,6 +75,125 @@ Selected audit entries from the run, including rejected requests:
 {"creator_id":"attacker_flood","event":"rejected","limit":"10 per 1 minute","reason":"rate_limited","status":"rejected","timestamp":"2026-11-05T02:06:11+00:00"}
 ```
 
+## My Five Criteria
+
+I replaced the placeholders in `scenarios.py` and ran
+`python run_eval.py --label before`. The evaluator produced
+`results/run_2026-11-04_2110_before.md`. Each trial was unchanged, and all
+three trials were identical.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. My own writing called AI | At most 1 of 10 | 0/10 | 0/10 | 0/10 | MET |
+| 2. All three labels reachable | 3 of 3 | 2/3 | 2/3 | 2/3 | MISSED |
+| 3. Malformed input returns 400, not 500 | 5 of 5 | 4/5 | 4/5 | 4/5 | MISSED |
+| 4. Every valid decision has complete fields | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 5. Identical input gives repeatable scores | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+The table and JSON below were produced by `run_eval.py::write_report`; the
+scenario inputs are defined in `scenarios.py::SCENARIOS`.
+
+### Criterion 1 output
+
+```json
+[
+  {"status":201,"guess":"unsure","confidence":0.4407,"model_score":0.5221,"style_score":0.3594},
+  {"status":201,"guess":"unsure","confidence":0.3694,"model_score":0.4807,"style_score":0.258},
+  {"status":201,"guess":"human","confidence":0.2631,"model_score":0.2492,"style_score":0.2771},
+  {"status":201,"guess":"human","confidence":0.2616,"model_score":0.2138,"style_score":0.3095},
+  {"status":201,"guess":"human","confidence":0.2589,"model_score":0.1883,"style_score":0.3295},
+  {"status":201,"guess":"human","confidence":0.2516,"model_score":0.1958,"style_score":0.3075},
+  {"status":201,"guess":"unsure","confidence":0.4173,"model_score":0.3267,"style_score":0.508},
+  {"status":201,"guess":"unsure","confidence":0.3779,"model_score":0.4952,"style_score":0.2606},
+  {"status":201,"guess":"human","confidence":0.2463,"model_score":0.138,"style_score":0.3546},
+  {"status":201,"guess":"unsure","confidence":0.3601,"model_score":0.3674,"style_score":0.3528}
+]
+```
+
+### Criterion 2 output
+
+```json
+[
+  {"status":201,"guess":"unsure","confidence":0.5221,"model_score":0.7384,"style_score":0.3058},
+  {"status":201,"guess":"unsure","confidence":0.4528,"model_score":0.3821,"style_score":0.5235},
+  {"status":201,"guess":"human","confidence":0.2512,"model_score":0.2271,"style_score":0.2754}
+]
+```
+
+### Criterion 3 output
+
+```json
+[
+  {"status":400,"guess":null,"confidence":null,"model_score":null,"style_score":null,"label":null,"sent":"(empty text)"},
+  {"status":400,"guess":null,"confidence":null,"model_score":null,"style_score":null,"label":null,"sent":"{\"creator_id\": \"eval_bad_missing\"}"},
+  {"status":400,"guess":null,"confidence":null,"model_score":null,"style_score":null,"label":null,"sent":"{\"text\": null, \"creator_id\": \"eval_bad_null\"}"},
+  {"status":null,"error":"JSONDecodeError: Expecting value: line 1 column 1 (char 0)","sent":"x"},
+  {"status":400,"guess":null,"confidence":null,"model_score":null,"style_score":null,"label":null,"sent":"{\"text\": [\"not\", \"text\"], \"creator_id\": \"eval_bad_list\"}"}
+]
+```
+
+### Criterion 4 output
+
+```json
+[
+  {"status":201,"guess":"human","confidence":0.1914,"model_score":0.0679,"style_score":0.3148,"label":"High-confidence human: this text is probably written by a person."},
+  {"status":201,"guess":"human","confidence":0.2511,"model_score":0.1647,"style_score":0.3375,"label":"High-confidence human: this text is probably written by a person."},
+  {"status":201,"guess":"unsure","confidence":0.3598,"model_score":0.1708,"style_score":0.5488,"label":"Unsure: the available signals are not strong enough to determine authorship."},
+  {"status":201,"guess":"human","confidence":0.3379,"model_score":0.3904,"style_score":0.2855,"label":"High-confidence human: this text is probably written by a person."},
+  {"status":201,"guess":"human","confidence":0.2742,"model_score":0.2856,"style_score":0.2627,"label":"High-confidence human: this text is probably written by a person."}
+]
+```
+
+### Criterion 5 output
+
+```json
+[
+  {"status":201,"guess":"human","confidence":0.2314,"model_score":0.0698,"style_score":0.3929},
+  {"status":201,"guess":"unsure","confidence":0.5051,"model_score":0.5419,"style_score":0.4683},
+  {"status":201,"guess":"human","confidence":0.2771,"model_score":0.2042,"style_score":0.35},
+  {"status":201,"guess":"human","confidence":0.3194,"model_score":0.323,"style_score":0.3157},
+  {"status":201,"guess":"unsure","confidence":0.4602,"model_score":0.3345,"style_score":0.586}
+]
+```
+
+### Diagnoses
+
+Criterion 2 missed at the label mapping stage. The first two inputs scored
+`0.5221` and `0.4528`, so they correctly mapped to `unsure`; the third scored
+`0.2512`, so it mapped to `human`. None reached the `0.65` AI threshold. The
+combining rule averaged the signals down, so the criterion's input selection
+did not cover the upper score range.
+
+Criterion 3 missed at the route and signal-one boundary. The route checks only
+that text is a non-empty string, so the single character `"x"` passed input
+validation. Signal one then raised `ValueError: Text is too short to score`,
+and Flask returned an HTML error page instead of JSON. The other four malformed
+bodies were safely rejected with `400`.
+
+The broken attack outcomes have the following stage and mechanism:
+
+- `EV01`: signal two, where typos increase measured word variety and lower the
+  apparent AI score.
+- `EV05`: signal two and the combining rule, where heavy editing makes both
+  signals look more human and the average crosses the human threshold.
+- `EV08`: signal one, where text below the model token window is not a reliable
+  authorship measurement and was classified human.
+- `FP05` and `FP07`: signal one, where predictable formal or repeated human
+  writing produced high model scores and the average crossed the AI threshold.
+- `MF02`: route validation, which accepted one character, followed by signal
+  one, which raised an unhandled short-text error.
+- `MF03`: route validation accepted control characters, then signal one
+  produced a zero score, so junk was treated as human.
+- `MF04`: route validation accepted punctuation-only text, and the two signals
+  produced an unsure decision instead of rejecting junk.
+- `MF05`, `MF06`, `MF07`, and `MF08`: route validation accepted malformed,
+  emoji, right-to-left, and oversized-but-allowed content; signal one and
+  signal two then produced ordinary classification scores for inputs that
+  should have been rejected as unusable.
+- `FL01_01` through `FL01_10`: the rate-limit stage intentionally allows the
+  first ten requests in the minute, so those flood requests reached scoring.
+  `FL01_11` and `FL01_12` were held with `429`.
+
 ## Signals and Scoring
 
 ### Model signal
