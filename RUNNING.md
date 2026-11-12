@@ -76,8 +76,8 @@ curl -X POST http://127.0.0.1:5000/submit \
   -d '{"text": "some writing", "creator_id": "me"}'
 ```
 
-It returns a `501` saying it isn't built yet. **That's the correct starting
-position.**
+It returns a classification response with both signal scores and the number of
+detector attempts.
 
 ---
 
@@ -182,6 +182,31 @@ still off. `GET /health` reports which.
 Rejections are logged for you. **An attack that shows up only as an absence is
 one you'll never find** — a thousand requests that got a `429` and left no
 trace look exactly like a quiet afternoon.
+
+### Demonstrating detector retries
+
+The service retries a detector failure twice, then returns `503`. To demo the
+permanent-failure path on Windows PowerShell, stop the service and run:
+
+```powershell
+$env:AI201_DETECTOR_MODEL="model-that-does-not-exist"
+python app.py
+```
+
+Submit the valid request again. The response includes
+`"error": "detector_unavailable"` and `"attempts": 3`. The failed request and a
+`request_completed` timing record are visible at:
+
+```powershell
+curl.exe "http://127.0.0.1:5000/log?limit=5"
+```
+
+Restore normal operation with:
+
+```powershell
+Remove-Item Env:AI201_DETECTOR_MODEL
+python app.py
+```
 
 ---
 

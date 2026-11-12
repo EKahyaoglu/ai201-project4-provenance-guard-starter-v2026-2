@@ -112,6 +112,24 @@ def log_rejection(creator_id: str, reason: str, **extra) -> dict:
     })
 
 
+def log_request(
+    input_summary: dict,
+    output_summary: dict,
+    status: int,
+    duration_ms: float,
+) -> dict:
+    """Record the observable result and cost of one HTTP submission."""
+    return _append({
+        "timestamp": _now(),
+        "event": "request_completed",
+        "route": "/submit",
+        "status": status,
+        "input": input_summary,
+        "output": output_summary,
+        "duration_ms": duration_ms,
+    })
+
+
 def _append(entry: dict) -> dict:
     config.LOG_DIR.mkdir(parents=True, exist_ok=True)
     line = json.dumps(entry, ensure_ascii=False)

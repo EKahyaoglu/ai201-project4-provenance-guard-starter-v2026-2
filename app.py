@@ -27,7 +27,7 @@ Routes:
 import time
 import uuid
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
 
 import audit
 import config
@@ -35,6 +35,38 @@ import scoring
 import stylometry
 
 app = Flask(__name__)
+
+
+@app.before_request
+def start_request_timer():
+    if request.path == "/submit":
+        g.submit_started = time.perf_counter()
+
+
+@app.after_request
+def log_request_result(response):
+    if request.path != "/submit":
+        return response
+
+    started = getattr(g, "submit_started", None)
+    duration_ms = round((time.perf_counter() - started) * 1000, 3) if started else None
+    payload = request.get_json(silent=True)
+    input_summary = {
+        "is_object": isinstance(payload, dict),
+        "text_length": len(payload.get("text", "")) if isinstance(payload, dict) and isinstance(payload.get("text"), str) else None,
+        "creator_id": payload.get("creator_id") if isinstance(payload, dict) else None,
+    }
+    output = response.get_json(silent=True)
+    audit.log_request(
+        input_summary=input_summary,
+        output_summary={
+            "error": output.get("error") if isinstance(output, dict) else None,
+            "guess": output.get("guess") if isinstance(output, dict) else None,
+        },
+        status=response.status_code,
+        duration_ms=duration_ms,
+    )
+    return response
 
 
 # ── Rate limiting — UNIT 8 ────────────────────────────────────────────────────

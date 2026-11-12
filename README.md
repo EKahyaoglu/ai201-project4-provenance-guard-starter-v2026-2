@@ -1,5 +1,21 @@
 # Provenance Guard
 
+## Build Summary
+
+- **System extended:** Provenance Guard, a local Flask service that scores
+  writing with a GPT-2 signal and a stylometry signal.
+- **New failure handling:** detector failures receive bounded retries. A
+  temporary failure can recover, while a permanent failure returns `503` after
+  three total attempts and is logged as rejected.
+- **New observability:** every `/submit` request writes a structured
+  `request_completed` audit record with timestamp, input summary, output
+  summary, HTTP status, and duration in milliseconds.
+- **Shape:** B, hardening an existing system against detector outages, malformed
+  input, and rate limits.
+- **Out of scope:** this remains a single-process local service. It does not
+  provide distributed retry coordination, persistent rate-limit storage, or
+  authorship certainty.
+
 ## What This Does
 
 1. `POST /submit` checks that the JSON body contains non-empty string values
@@ -281,6 +297,62 @@ possible AI submission, because a false accusation harms a real writer's
 review and trust. The cost is that some AI text would remain in the unsure or
 human bands, so I would pair the detector with human review rather than treat
 the label as proof.
+
+## Failure-Handling Run Log
+
+The dedicated evidence file is
+`results/failure_handling_run.md`.
+
+The extension was tested separately from the earlier classifier run. Each row
+has three trials. The baseline uses the same service with
+`DETECTOR_RETRIES=0`; the after run uses the default two retries.
+
+| Criterion | Before fix, trials 1-3 | After fix, trials 1-3 | Verdict after | Diagnosis |
+|---|---|---|---|---|
+| 1. Temporary recovery | 503 after 1 attempt, 3/3 | 201 after 2 attempts, 3/3 | MET | Retry loop recovers a transient detector outage. |
+| 2. Permanent failure | 503 after 1 attempt, 3/3 | 503 after 3 attempts, 3/3 | MET | Retry loop is bounded and rejection is logged. |
+| 3. Invalid input | 400, detector calls 0, 3/3 | 400, detector calls 0, 3/3 | MET | Validation already ran before the extension. |
+| 4. Rate-limit visibility | 429 and rejection log, 3/3 | 429 and rejection log, 3/3 | MET | Existing limiter and rejection handler meet the target. |
+| 5. Structured timing | No request record, 3/3 | Complete record, 3/3 | MET | `after_request` now records input, output, status, and duration. |
+
+The baseline and after values were measured with Flask's test client and
+detector stubs, so the model download was not part of this comparison. The
+three trials for each criterion used fresh temporary audit logs.
+
+### Structured log extract
+
+Each line below is one measured `/submit` completion record. The input is
+summarized rather than storing the submitted writing in this timing event.
+
+```json
+{"timestamp":"2026-11-11T21:52:01+00:00","event":"request_completed","route":"/submit","status":201,"input":{"is_object":true,"text_length":54,"creator_id":"demo"},"output":{"error":null,"guess":"unsure"},"duration_ms":0.41}
+{"timestamp":"2026-11-11T21:52:01+00:00","event":"request_completed","route":"/submit","status":503,"input":{"is_object":true,"text_length":54,"creator_id":"demo"},"output":{"error":"detector_unavailable","guess":null},"duration_ms":0.32}
+{"timestamp":"2026-11-11T21:52:02+00:00","event":"request_completed","route":"/submit","status":400,"input":{"is_object":true,"text_length":0,"creator_id":"demo"},"output":{"error":"invalid_text","guess":null},"duration_ms":0.27}
+{"timestamp":"2026-11-11T21:52:02+00:00","event":"request_completed","route":"/submit","status":429,"input":{"is_object":true,"text_length":54,"creator_id":"flood"},"output":{"error":"rate_limited","guess":null},"duration_ms":0.38}
+{"timestamp":"2026-11-11T21:52:03+00:00","event":"request_completed","route":"/submit","status":201,"input":{"is_object":true,"text_length":54,"creator_id":"demo"},"output":{"error":null,"guess":"unsure"},"duration_ms":0.36}
+{"timestamp":"2026-11-11T21:52:03+00:00","event":"request_completed","route":"/submit","status":503,"input":{"is_object":true,"text_length":54,"creator_id":"demo"},"output":{"error":"detector_unavailable","guess":null},"duration_ms":0.34}
+{"timestamp":"2026-11-11T21:52:04+00:00","event":"request_completed","route":"/submit","status":400,"input":{"is_object":false,"text_length":null,"creator_id":null},"output":{"error":"invalid_json","guess":null},"duration_ms":0.22}
+{"timestamp":"2026-11-11T21:52:04+00:00","event":"request_completed","route":"/submit","status":429,"input":{"is_object":true,"text_length":54,"creator_id":"flood"},"output":{"error":"rate_limited","guess":null},"duration_ms":0.39}
+{"timestamp":"2026-11-11T21:52:05+00:00","event":"request_completed","route":"/submit","status":201,"input":{"is_object":true,"text_length":54,"creator_id":"demo"},"output":{"error":null,"guess":"unsure"},"duration_ms":0.35}
+{"timestamp":"2026-11-11T21:52:05+00:00","event":"request_completed","route":"/submit","status":503,"input":{"is_object":true,"text_length":54,"creator_id":"demo"},"output":{"error":"detector_unavailable","guess":null},"duration_ms":0.33}
+```
+
+### Cost measurement
+
+One failure-handling run costs **three detector attempts and about 0.75 seconds
+of retry delay** in the permanent-failure case. I measured this by setting
+`AI201_DETECTOR_RETRIES=2`, `AI201_DETECTOR_RETRY_DELAY=0.25`, forcing the
+detector to raise `DetectorUnavailable`, and timing the three calls with
+`time.perf_counter()`. A successful first attempt costs no retry delay; a
+successful second attempt costs one delay.
+
+## What's Left
+
+The retry extension does not make the detector accurate or distributed. A
+production version would add persistent rate-limit storage, request
+correlation IDs, and a queue for slow model work. I stopped after the bounded
+retry and structured timing changes because they address the selected failure
+path without changing the classifier's scoring policy.
 
 ## Signals and Scoring
 
