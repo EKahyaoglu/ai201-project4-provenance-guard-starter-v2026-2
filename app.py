@@ -24,6 +24,7 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import time
 import uuid
 
 from flask import Flask, jsonify, request
@@ -117,17 +118,16 @@ if config.RATE_LIMITING_ENABLED:
         }), 429
 
 
-def _log_submit_rejection(payload, reason: str) -> None:
+def _log_submit_rejection(payload, reason: str, **extra) -> None:
     creator_id = "unknown"
     if isinstance(payload, dict):
         candidate = payload.get("creator_id")
         if isinstance(candidate, str) and candidate.strip():
             creator_id = candidate
-    audit.log_rejection(creator_id=creator_id, reason=reason)
+    audit.log_rejection(creator_id=creator_id, reason=reason, **extra)
 
 
-# ── The worked example. Already works. Don't edit. ────────────────────────────
-
+# Working example (Don't edit)
 @app.post("/ping")
 def ping():
     """
@@ -233,7 +233,25 @@ def submit():
     import detector
 
     content_id = str(uuid.uuid4())
-    model_score = detector.model_signal(text)
+    detector_attempts = 0
+    for detector_attempts in range(1, config.DETECTOR_RETRIES + 2):
+        try:
+            model_score = detector.model_signal(text)
+            break
+        except detector.DetectorUnavailable:
+            if detector_attempts > config.DETECTOR_RETRIES:
+                _log_submit_rejection(
+                    payload,
+                    "detector_unavailable",
+                    attempts=detector_attempts,
+                )
+                return jsonify({
+                    "error": "detector_unavailable",
+                    "message": "The detector is temporarily unavailable. Try again shortly.",
+                    "attempts": detector_attempts,
+                }), 503
+            time.sleep(config.DETECTOR_RETRY_DELAY)
+
     style_score = stylometry.style_signal(text)
     combined_score = scoring.combine_signals(model_score, style_score)
     guess, label = scoring.score_to_label(combined_score)
@@ -245,6 +263,7 @@ def submit():
         style_score=style_score,
         combined_score=combined_score,
         label=label,
+        detector_attempts=detector_attempts,
     )
     return jsonify({
         "content_id": content_id,
@@ -253,6 +272,7 @@ def submit():
         "label": label,
         "model_score": model_score,
         "style_score": style_score,
+        "detector_attempts": detector_attempts,
     }), 201
 
 

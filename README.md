@@ -35,6 +35,15 @@ The limiter returns `429` after the per-minute limit is reached. Rate-limited
 requests and invalid submissions are recorded in the audit log as rejected
 events.
 
+If the local detector cannot load or score a submission, `/submit` returns
+`503` with `error: "detector_unavailable"` instead of a server error. The
+failed submission is also recorded as a rejected audit event, so a client can
+retry after a short delay. Before giving up, the service makes two bounded
+retries with a 250 ms delay. Successful responses include `detector_attempts`,
+and permanent failures include the same count in the response and audit log.
+Set `AI201_DETECTOR_RETRIES` or `AI201_DETECTOR_RETRY_DELAY` to adjust this
+policy.
+
 ## Attack Run - Before
 
 I ran all 56 rows from the supplied attack set on 2026-11-04. The detailed

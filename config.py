@@ -46,6 +46,11 @@ DETECTOR_MODEL = os.getenv("AI201_DETECTOR_MODEL", "gpt2")
 # 300 words, which is enough for the signal to mean something.
 DETECTOR_MAX_TOKENS = 400
 
+# A temporary model-loading failure should not immediately become a failed
+# submission. Keep these small because model scoring happens inside the request.
+DETECTOR_RETRIES = max(0, int(os.getenv("AI201_DETECTOR_RETRIES", "2")))
+DETECTOR_RETRY_DELAY = max(0.0, float(os.getenv("AI201_DETECTOR_RETRY_DELAY", "0.25")))
+
 
 # ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
 # How much each signal counts toward the combined score.
