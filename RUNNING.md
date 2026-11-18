@@ -10,9 +10,30 @@ assumed — the starter ships one that already answers.
 
 ## Before your first class
 
+Use Python 3.11 through 3.13. Python 3.14 is not supported by the pinned package
+stack.
+
+### Windows PowerShell
+
+```bash
+py -3.13 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python test.py
+```
+
+If PowerShell blocks activation, run this once in the current PowerShell window:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+### macOS or Linux
+
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
+source .venv/bin/activate
 pip install -r requirements.txt
 python test.py
 ```
@@ -29,6 +50,40 @@ That downloads about 550 MB and scores a sample.
 
 > **No API key for this pair.** Nothing here calls a hosted service. The model
 > that reads your text runs on your own laptop.
+
+---
+
+## Demo Day quick run
+
+Start the service in PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python app.py
+```
+
+Open a second PowerShell window and run:
+
+```powershell
+curl.exe -X POST http://127.0.0.1:5000/ping -H "Content-Type: application/json" -d '{"message":"hello"}'
+curl.exe -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{"text":"This is a full written paragraph used to demonstrate the local detector and the stylometry signal together.","creator_id":"demo"}'
+curl.exe "http://127.0.0.1:5000/log?limit=5"
+```
+
+The submit response should include `content_id`, `guess`, `label`,
+`model_score`, `style_score`, and `detector_attempts`. The log response should
+include the decision and a `request_completed` timing entry.
+
+Before peers test this copy, run:
+
+```powershell
+python test.py
+python run_eval.py --label before
+python run_attacks.py --set attack_set --label before
+```
+
+Only the first command is required for the quick setup. The last two commands
+show the project evidence and may take longer because the local detector loads.
 
 ---
 
@@ -58,7 +113,7 @@ sent it data, it sent something back.
 > service. The `\` line breaks don't work there either. This does:
 >
 > ```powershell
-> curl.exe -X POST http://127.0.0.1:5000/ping -H "Content-Type: application/json" -d '{\"message\": \"hello\"}'
+> curl.exe -X POST http://127.0.0.1:5000/ping -H "Content-Type: application/json" -d '{"message": "hello"}'
 > ```
 >
 > Every `curl` command in this file and in the brief works the same way: swap
