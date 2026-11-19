@@ -1,17 +1,10 @@
-# Running Provenance Guard
-
+# Provenance Guard
 Everything about how the starter works.
 
 This is a **web service**. It runs on your machine and you talk to it with
 `curl` from another terminal. If you've not built a backend before, that's
 assumed — the starter ships one that already answers.
 
----
-
-## Before your first class
-
-Use Python 3.11 through 3.13. Python 3.14 is not supported by the pinned package
-stack.
 
 ### Windows PowerShell
 
@@ -53,37 +46,66 @@ That downloads about 550 MB and scores a sample.
 
 ---
 
-## Demo Day quick run
+## Demo Day setup
 
-Start the service in PowerShell:
+In PowerShell, create the environment and install the requirements:
 
 ```powershell
+py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python test.py
+```
+
+Start the service:
+
+```powershell
 python app.py
 ```
 
-Open a second PowerShell window and run:
+Open a second PowerShell window, activate the environment, and run these
+examples:
 
 ```powershell
-curl.exe -X POST http://127.0.0.1:5000/ping -H "Content-Type: application/json" -d '{"message":"hello"}'
-curl.exe -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{"text":"This is a full written paragraph used to demonstrate the local detector and the stylometry signal together.","creator_id":"demo"}'
-curl.exe "http://127.0.0.1:5000/log?limit=5"
+.\.venv\Scripts\Activate.ps1
 ```
 
-The submit response should include `content_id`, `guess`, `label`,
-`model_score`, `style_score`, and `detector_attempts`. The log response should
-include the decision and a `request_completed` timing entry.
-
-Before peers test this copy, run:
+### Human example
 
 ```powershell
-python test.py
-python run_eval.py --label before
-python run_attacks.py --set attack_set --label before
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/submit" -ContentType "application/json" -Body '{"text":"This is a full written paragraph used to demonstrate the local detector and the stylometry signal together.","creator_id":"demo"}' | ConvertTo-Json -Depth 5
 ```
 
-Only the first command is required for the quick setup. The last two commands
-show the project evidence and may take longer because the local detector loads.
+### Error example
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/submit" -ContentType "application/json" -Body '{"text":"short","creator_id":"demo_bad"}'
+```
+
+This returns `text_too_short` because the service requires at least 20
+non-whitespace characters.
+
+### AI-like example
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/submit" -ContentType "application/json" -Body '{"text":"To configure the service, edit the settings file in the installation directory. Set the host value to the address the service should bind to. Set the port value to an unused port above 1024. Save the file and restart the service. The service will log its startup configuration. If the port is already in use, the service will exit with an error. Check the log file for details before retrying.","creator_id":"demo_ai"}' | ConvertTo-Json -Depth 5
+```
+
+### Human-like example
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/submit" -ContentType "application/json" -Body '{"text":"Communication at work matters more than people say it does — and I mean the boring kind, not the away-day kind. Teams that actually tell each other things get more done. Obviously. A few things help. Regular check-ins, which everyone hates and everyone needs. Writing decisions down, so nobody has to remember what was agreed in a corridor in March. And making it genuinely safe to ask a stupid question, which is the hardest one and the one that matters most.","creator_id":"demo_human"}' | ConvertTo-Json -Depth 5
+```
+
+### View the audit log
+
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:5000/log?limit=5"
+```
+
+The successful response includes `content_id`, `guess`, `label`, both signal
+scores, and `detector_attempts`. The audit log includes the decision and a
+`request_completed` timing record.
 
 ---
 
